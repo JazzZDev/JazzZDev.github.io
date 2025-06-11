@@ -6,8 +6,8 @@
     <title>TimePass - A Legendary Creation</title>
     <style>
         body {
-            background: #ffffff;
-            min-height: 101vh;
+            background: #ffffff; /* Pure grey background */
+            min-height: 100vh;
             margin: 0;
             overflow: hidden;
             display: flex;
@@ -489,7 +489,9 @@
 
         // --- Timer Logic ---
         function startTimer() {
-            timeLeft = Math.max(baseTime - (round - 1) * 3, 10);
+            // Calculate timeLeft: baseTime - (round - 1) * 3, but +10s for every 3 rounds
+            let extraTime = Math.floor((round - 1) / 3) * 10;
+            timeLeft = Math.max(baseTime - (round - 1) * 3 + extraTime, 10);
             timerDiv.textContent = `Time: ${timeLeft.toFixed(1)}`;
             timerInterval = setInterval(() => {
                 if (gameOver) {
