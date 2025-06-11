@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimePass - A Legendary Creation</title>
+    <style>
+        body {
+            background: #ffffff; /* Pure grey background */
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        h1 {
+            color: #fff;
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+            letter-spacing: 0.2em;
+            text-shadow: 0 2px 10px #e94560, 0 0px 40px #fff2;
+        }
+        .moving-img {
+            position: absolute;
+            left: 50vw;
+            top: 50vh;
+            transform: translate(-50%, -50%);
+            width: 140px;
+            height: 140px;
+            border-radius: 30px;
+            box-shadow:
+                0 4px 40px #e94560cc,
+                0 0px 80px #0f346088;
+            filter: drop-shadow(0 0 30px #fff4) brightness(1.1) contrast(1.2);
+            cursor: pointer;
+            transition: filter 0.2s, box-shadow 0.2s, transform 0.2s;
+            z-index: 10;
+            user-select: none;
+            border: 4px solid #fff4;
+            background: linear-gradient(135deg, #e94560 0%, #0f3460 100%);
+            object-fit: cover;
+        }
+        .moving-img:hover {
+            filter: drop-shadow(0 0 60px #e94560cc) brightness(1.3) contrast(1.3);
+            box-shadow: 0 0 80px #43cea2cc, 0 0 120px #ffd20088;
+            transform: translate(-50%, -50%) scale(1.1) rotate(-8deg);
+            border-color: #ffd200;
+        }
+        .play-btn {
+            position: absolute;
+            left: 50vw;
+            top: calc(50vh + 120px);
+            transform: translate(-50%, 0);
+            padding: 16px 40px;
+            font-size: 1.5rem;
+            font-family: inherit;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(90deg, #e94560, #0f3460);
+            border: none;
+            border-radius: 30px;
+            box-shadow: 0 4px 20px #e9456088;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+            z-index: 20;
+            outline: none;
+        }
+        .play-btn:hover {
+            background: linear-gradient(90deg, #ffd200, #43cea2);
+            color: #222;
+            box-shadow: 0 0 40px #ffd20088;
+            transform: translate(-50%, 0) scale(1.08);
+        }
+        #gameCanvas {
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 100;
+            pointer-events: none;
+        }
+        .timer {
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            color: #fff;
+            font-size: 2rem;
+            font-family: monospace;
+            background: rgba(0,0,0,0.4);
+            padding: 8px 24px;
+            border-radius: 16px;
+            box-shadow: 0 0 20px #e9456088;
+            z-index: 200;
+        }
+        .win-message {
+            position: absolute;
+            left: 50vw;
+            top: 30vh;
+            transform: translate(-50%, -50%);
+            color: #ffd200;
+            font-size: 3rem;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            text-shadow: 0 2px 20px #0f3460, 0 0px 40px #fff2;
+            background: rgba(0,0,0,0.7);
+            padding: 30px 60px;
+            border-radius: 30px;
+            z-index: 999;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <img src="logo.png" alt="Logo" id="logoImg" style="position:absolute; left:50vw; top:12vh; transform:translate(-50%,0); width:300px; z-index:30;">
+    <!-- APPICON.webp is always present as a target -->
+    <img src="APPICON.webp" alt="App Icon" class="moving-img" id="movingImg" style="width:90px; height:90px;">
+    <!-- Dynamic target image, hidden by default -->
+    <img src="" alt="Random Target" class="moving-img" id="randomTargetImg" style="width:90px; height:90px; display:none;">
+    <button class="play-btn" id="playBtn">Play</button>
+    <button class="play-btn" id="nextRoundBtn" style="display:none; top: calc(50vh + 200px);">Next Round</button>
+    <canvas id="gameCanvas"></canvas>
+    <div class="timer" id="timer">Time: 30.0</div>
+    <div class="win-message" id="winMsg">🎉 You Win! 🎉</div>
+    <div class="timer" id="bulletsLeft" style="top: 80px; right: 40px;">Rounds Left: 10</div>
+    <!-- Add credit at the bottom -->
+    <div style="position:fixed; bottom:18px; left:0; width:100%; text-align:center; color:#ffd200; font-family:monospace; font-size:1.2rem; text-shadow:0 2px 8px #0f3460;">
+        Made By AstralisNexus
+    </div>
+    <script>
+        // --- Image Pool for Random Targets (excluding APPICON.webp) ---
+        const imagePool = [
+            "shadowslave.jpg",
+            "mvs.jpg"
+            // Add more image filenames here
+        ];
+
+        // --- Target Management ---
+        let targets = []; // Array of {img, x, y, vx, vy, alive, isAppIcon}
+
+        // Helper to create a target image element
+        function createTarget(imgSrc, isAppIcon = false) {
+            const img = document.createElement('img');
+            img.src = imgSrc;
+            img.className = 'moving-img';
+            img.style.width = img.style.height = '90px';
+            img.style.position = 'absolute';
+            img.style.display = 'block';
+            img.style.zIndex = 10;
+            document.body.appendChild(img);
+            return {
+                img,
+                x: Math.random() * (window.innerWidth - imgWidth) + imgWidth / 2,
+                y: Math.random() * (window.innerHeight - imgHeight) + imgHeight / 2,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                alive: true,
+                isAppIcon
+            };
+        }
+
+        // Remove all dynamic targets from DOM
+        function clearTargets() {
+            for (const t of targets) {
+                if (!t.isAppIcon) t.img.remove();
+            }
+            targets = [];
+        }
+
+        // --- Moving Icon Logic ---
+        const appIcon = document.getElementById('movingImg'); // APPICON.webp (always present)
+        const randomTargetImg = document.getElementById('randomTargetImg'); // Random target
+        const playBtn = document.getElementById('playBtn');
+        const logoImg = document.getElementById('logoImg');
+        let vx = 0, vy = 0, x = window.innerWidth / 2, y = window.innerHeight / 2;
+        let rvx = 0, rvy = 0, rx = window.innerWidth / 2, ry = window.innerHeight / 2;
+        const imgWidth = 90, imgHeight = 90;
+        let moving = false, gameOver = false, round = 1;
+        let baseMaxSpeed = 4, baseTime = 30.0;
+        const MAX_ROUNDS = 10;
+        const bulletsLeftDiv = document.getElementById('bulletsLeft');
+        const nextRoundBtn = document.getElementById('nextRoundBtn');
+
+        // --- Canvas Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Gun ---
+        const gun = {
+            x: 80,
+            y: canvas.height - 80,
+            width: 60,
+            height: 40,
+            angle: 0 // radians
+        };
+
+        // --- Bullets ---
+        let bullets = [];
+        let lastShotTime = 0;
+        const bulletCooldown = 300;
+
+        // --- Timer ---
+        const timerDiv = document.getElementById('timer');
+        let timeLeft = 30.0;
+        let timerInterval = null;
+
+        // --- Win Message ---
+        const winMsg = document.getElementById('winMsg');
+
+        // --- Target Image Logic ---
+        function setRandomTargetImage() {
+            if (imagePool.length === 0) {
+                randomTargetImg.style.display = "none";
+                return;
+            }
+            const randomImg = imagePool[Math.floor(Math.random() * imagePool.length)];
+            randomTargetImg.src = randomImg;
+            // Spawn at random position
+            rx = Math.random() * (window.innerWidth - imgWidth) + imgWidth / 2;
+            ry = Math.random() * (window.innerHeight - imgHeight) + imgHeight / 2;
+            randomTargetImg.style.left = `${rx}px`;
+            randomTargetImg.style.top = `${ry}px`;
+            randomTargetImg.style.display = "block";
+            // Give random velocity
+            rvx = (Math.random() - 0.5) * 2;
+            rvy = (Math.random() - 0.5) * 2;
+        }
+
+        // --- Animate Icons ---
+        function animate() {
+            if (moving && !gameOver) {
+                // Move all targets
+                for (const t of targets) {
+                    if (!t.alive) continue;
+                    t.x += t.vx;
+                    t.y += t.vy;
+                    if (t.x < imgWidth / 2) { t.x = imgWidth / 2; t.vx *= -1; }
+                    if (t.x > window.innerWidth - imgWidth / 2) { t.x = window.innerWidth - imgWidth / 2; t.vx *= -1; }
+                    if (t.y < imgHeight / 2) { t.y = imgHeight / 2; t.vy *= -1; }
+                    if (t.y > window.innerHeight - imgHeight / 2) { t.y = window.innerHeight - imgHeight / 2; t.vy *= -1; }
+                    // Evasion logic (same as before, but per target)
+                    let maxThreat = 0, escapeVx = 0, escapeVy = 0;
+                    for (let b of bullets) {
+                        const dx = t.x - b.x, dy = t.y - b.y, dist = Math.sqrt(dx * dx + dy * dy);
+                        const bulletDir = Math.atan2(b.vy, b.vx), toLogoDir = Math.atan2(dy, dx);
+                        const angleDiff = Math.abs(Math.atan2(Math.sin(bulletDir - toLogoDir), Math.cos(bulletDir - toLogoDir)));
+                        if (dist < 300 && angleDiff < Math.PI / 2) {
+                            let threatLevel = (1 - angleDiff / (Math.PI / 2)) * (1 - dist / 300);
+                            if (threatLevel > maxThreat) {
+                                maxThreat = threatLevel;
+                                escapeVx = dx / dist;
+                                escapeVy = dy / dist;
+                            }
+                        }
+                    }
+                    if (maxThreat > 0) {
+                        t.vx += escapeVx * 2.5 * maxThreat;
+                        t.vy += escapeVy * 2.5 * maxThreat;
+                        const speed = Math.sqrt(t.vx * t.vx + t.vy * t.vy);
+                        const maxSpeed = baseMaxSpeed + (round - 1) * 2;
+                        if (speed > maxSpeed) {
+                            t.vx = (t.vx / speed) * maxSpeed;
+                            t.vy = (t.vy / speed) * maxSpeed;
+                        }
+                    } else {
+                        t.vx += (Math.random() - 0.5) * 0.2;
+                        t.vy += (Math.random() - 0.5) * 0.2;
+                        const speed = Math.sqrt(t.vx * t.vx + t.vy * t.vy);
+                        const maxSpeed = 4;
+                        if (speed > maxSpeed) {
+                            t.vx = (t.vx / speed) * maxSpeed;
+                            t.vy = (t.vy / speed) * maxSpeed;
+                        }
+                    }
+                    t.img.style.left = `${t.x}px`;
+                    t.img.style.top = `${t.y}px`;
+                }
+            }
+            drawGame();
+            requestAnimationFrame(animate);
+        }
+
+        // --- Setup Targets for Each Round ---
+        function setupTargets() {
+            clearTargets();
+            // Always add APPICON.webp
+            const appTarget = createTarget("APPICON.webp", true);
+            targets.push(appTarget);
+            // Add N random targets from pool (N = round)
+            let used = [];
+            for (let i = 0; i < round; i++) {
+                let idx;
+                do {
+                    idx = Math.floor(Math.random() * imagePool.length);
+                } while (used.includes(idx) && imagePool.length > round);
+                used.push(idx);
+                const t = createTarget(imagePool[idx]);
+                targets.push(t);
+            }
+        }
+
+        // --- Draw Game (updated collision logic) ---
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw gun (same as before)
+            ctx.save();
+            ctx.translate(gun.x, gun.y);
+            ctx.rotate(gun.angle);
+            ctx.fillStyle = "#ffd200";
+            ctx.fillRect(0, -8, gun.width, 16);
+            ctx.fillStyle = "#222";
+            ctx.fillRect(-20, -20, 40, 40);
+            ctx.restore();
+            // Draw bullets
+            for (let i = 0; i < bullets.length; i++) {
+                const b = bullets[i];
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, 2 * Math.PI);
+                ctx.fillStyle = "#e94560";
+                ctx.shadowColor = "#ffd200";
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            // Move bullets and check collision with all targets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                if (
+                    b.x < 0 || b.x > canvas.width ||
+                    b.y < 0 || b.y > canvas.height
+                ) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                for (const t of targets) {
+                    if (!t.alive) continue;
+                    if (
+                        b.x > t.x - imgWidth / 2 &&
+                        b.x < t.x + imgWidth / 2 &&
+                        b.y > t.y - imgHeight / 2 &&
+                        b.y < t.y + imgHeight / 2
+                    ) {
+                        popTarget(t);
+                        bullets.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // --- Pop Target Logic (updated) ---
+        function popTarget(target) {
+            target.alive = false;
+            target.img.style.visibility = "hidden";
+            // Check if all targets are popped
+            if (targets.every(t => !t.alive)) {
+                moving = false;
+                winMsg.textContent = "🎉 All Targets Popped! 🎉";
+                winMsg.style.display = "block";
+                nextRoundBtn.style.display = "block";
+                timerDiv.textContent = "You Win!";
+                bulletsLeftDiv.textContent = `Rounds Left: ${MAX_ROUNDS - round}`;
+                clearInterval(timerInterval);
+            }
+        }
+
+        // --- Start Game (updated) ---
+        function startGame() {
+            moving = true;
+            gameOver = false;
+            playBtn.style.display = 'none';
+            winMsg.style.display = 'none';
+            nextRoundBtn.style.display = 'none';
+            bullets = [];
+            if (logoImg) logoImg.style.display = 'none';
+            bulletsLeftDiv.textContent = `Rounds Left: ${MAX_ROUNDS - round + 1}`;
+            setupTargets();
+            startTimer();
+        }
+
+        // Mouse move: aim gun
+        document.addEventListener('mousemove', (e) => {
+            if (!moving || gameOver) return;
+            gun.angle = Math.atan2(e.clientY - gun.y, e.clientX - gun.x);
+        });
+
+        // Click to shoot
+        document.addEventListener('mousedown', (e) => {
+            if (!moving || gameOver) return;
+            if (e.target === playBtn || e.target === appIcon || e.target === randomTargetImg) return;
+            const now = Date.now();
+            if (now - lastShotTime < bulletCooldown) return;
+            lastShotTime = now;
+            const speed = 10;
+            const angle = gun.angle;
+            const bx = gun.x + Math.cos(angle) * gun.width;
+            const by = gun.y + Math.sin(angle) * gun.width;
+            bullets.push({
+                x: bx,
+                y: by,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                radius: 8
+            });
+        });
+
+        // --- Draw Gun, Bullets, and Check Collision ---
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw gun (simple rectangle + barrel)
+            ctx.save();
+            ctx.translate(gun.x, gun.y);
+            ctx.rotate(gun.angle);
+            ctx.fillStyle = "#ffd200";
+            ctx.fillRect(0, -8, gun.width, 16);
+            ctx.fillStyle = "#222";
+            ctx.fillRect(-20, -20, 40, 40);
+            ctx.restore();
+
+            // Draw bullets
+            for (let i = 0; i < bullets.length; i++) {
+                const b = bullets[i];
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, 2 * Math.PI);
+                ctx.fillStyle = "#e94560";
+                ctx.shadowColor = "#ffd200";
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // Move bullets and check collision with all targets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                if (
+                    b.x < 0 || b.x > canvas.width ||
+                    b.y < 0 || b.y > canvas.height
+                ) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                for (const t of targets) {
+                    if (!t.alive) continue;
+                    if (
+                        b.x > t.x - imgWidth / 2 &&
+                        b.x < t.x + imgWidth / 2 &&
+                        b.y > t.y - imgHeight / 2 &&
+                        b.y < t.y + imgHeight / 2
+                    ) {
+                        popTarget(t);
+                        bullets.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // --- Pop Target Logic (updated) ---
+        function popTarget(target) {
+            target.alive = false;
+            target.img.style.visibility = "hidden";
+            // Check if all targets are popped
+            if (targets.every(t => !t.alive)) {
+                moving = false;
+                winMsg.textContent = "🎉 All Targets Popped! 🎉";
+                winMsg.style.display = "block";
+                nextRoundBtn.style.display = "block";
+                timerDiv.textContent = "You Win!";
+                bulletsLeftDiv.textContent = `Rounds Left: ${MAX_ROUNDS - round}`;
+                clearInterval(timerInterval);
+            }
+        }
+
+        // --- Timer Logic ---
+        function startTimer() {
+            timeLeft = Math.max(baseTime - (round - 1) * 3, 10);
+            timerDiv.textContent = `Time: ${timeLeft.toFixed(1)}`;
+            timerInterval = setInterval(() => {
+                if (gameOver) {
+                    clearInterval(timerInterval);
+                    return;
+                }
+                timeLeft -= 0.1;
+                if (timeLeft <= 0) {
+                    timeLeft = 0;
+                    timerDiv.textContent = `Time: 0.0`;
+                    loseGame();
+                    clearInterval(timerInterval);
+                } else {
+                    timerDiv.textContent = `Time: ${timeLeft.toFixed(1)}`;
+                }
+            }, 100);
+        }
+
+        function loseGame(msg) {
+            gameOver = true;
+            winMsg.textContent = msg || "😢 Time's Up! Try Again!";
+            winMsg.style.display = 'block';
+            playBtn.style.display = 'block';
+            round = 1;
+            bulletsLeftDiv.textContent = `Rounds Left: ${MAX_ROUNDS}`;
+            clearTargets();
+        }
+
+        // --- Initial Setup ---
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            // Optionally reposition targets on resize
+        });
+        clearTargets();
+        animate();
+
+        playBtn.addEventListener('click', startGame);
+        nextRoundBtn.addEventListener('click', () => {
+            round++;
+            startGame();
+        });
+    </script>
+</body>
+</html>
